@@ -1,0 +1,8 @@
+Structure of the Codebase:
+1. Monorepo architecture containing all services.
+2. Services are implemented as microservices communicating via REST and gRPC.
+3. Infrastructure as Code using Terraform for provisioning.
+4. Kubernetes for container orchestration.
+5. Docker used for containerization of services.
+6. CI/CD pipelines managed through GitHub Actions.
+7. Shared libraries located in /libs directory.

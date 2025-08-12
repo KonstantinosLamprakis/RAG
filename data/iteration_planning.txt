@@ -1,0 +1,8 @@
+Procedures for Iteration Planning and Retrospectives:
+1. Iterations last 2 weeks.
+2. Planning meeting on the first day to define sprint goals and backlog items.
+3. Daily standup at 9:30 AM to sync progress.
+4. Mid-sprint check-in to assess progress towards goals.
+5. Retrospective meeting at the end of iteration to discuss what went well, what can improve.
+6. Track metrics such as velocity, cycle time, and bug count.
+7. Document learnings and improvements in Confluence.
