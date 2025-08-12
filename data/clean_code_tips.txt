@@ -1,0 +1,8 @@
+Tips on Writing Clean Code:
+1. Follow consistent naming conventions (camelCase for variables, PascalCase for classes).
+2. Write self-documenting code; comments should explain 'why' not 'what'.
+3. Keep functions small and focused on a single responsibility.
+4. Write unit tests for all new features.
+5. Avoid deeply nested loops and conditions.
+6. Follow DRY (Don't Repeat Yourself) and KISS (Keep It Simple, Stupid) principles.
+7. Review code through peer reviews before merging.

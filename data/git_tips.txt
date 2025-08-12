@@ -1,0 +1,8 @@
+Tips on Using Git:
+1. Write clear and concise commit messages (use imperative mood, e.g., "Add feature" not "Added feature").
+2. Use rebase instead of merge to keep history clean.
+3. All Pull Requests (PRs) require at least 2 approvals before merging.
+4. Keep feature branches small and focused on one task.
+5. Always pull latest changes before pushing to avoid conflicts.
+6. Use 'git stash' to temporarily save work in progress.
+7. Delete merged branches to keep repository tidy.
