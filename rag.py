@@ -6,24 +6,44 @@ from chromadb.utils import  embedding_functions
 from openai import OpenAI
 import os 
 from dotenv import load_dotenv
+from enum import Enum
+
+class FileExtensions(Enum):
+    CSV = ".csv"
+    PDF = ".pdf"
+    TXT = ".txt"
+    
+# Constants for RAG system configuration
+DATA_DIRECTORY = "./data"
+COMPANY_KNOWLEDGE_COLLECTION = "company_knowledge"
+MAX_TOKENS = 500
+TEMPERATURE = 0.3
+TOP_K_RESULTS = 2
+
+# Model configuration constants
+OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
+OLLAMA_EMBEDDING_MODEL = "nomic-embed-text"
+OPENAI_LLM_MODEL = "gpt-4o-mini"
+OLLAMA_LLM_MODEL = "llama3.2"
+OLLAMA_BASE_URL = "http://localhost:11434/v1"
+OLLAMA_API_KEY = "ollama"
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 load_dotenv()
-directory_path="./data"
 
 class EmbeddingModel:
     def __init__(self, model_type="openai"):
         self.model_type = model_type
         if model_type == "openai":
             self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            self.embedding_fn = embedding_functions.OpenAIEmbeddingFunction(api_key=os.getenv("OPENAI_API_KEY"), model_name="text-embedding-ada-002")
+            self.embedding_fn = embedding_functions.OpenAIEmbeddingFunction(api_key=os.getenv("OPENAI_API_KEY"), model_name=OPENAI_EMBEDDING_MODEL)
         elif model_type == "chroma":
             self.embedding_fn = embedding_functions.DefaultEmbeddingFunction()
         elif model_type == "nomic":
             self.embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
-                api_key="ollama",
-                api_base="http://localhost:11434/v1",
-                model_name="nomic-embed-text", 
+                api_key=OLLAMA_API_KEY,
+                api_base=OLLAMA_BASE_URL,
+                model_name=OLLAMA_EMBEDDING_MODEL, 
             )
 
 class LLMModel:
@@ -31,18 +51,18 @@ class LLMModel:
         self.model_type = model_type
         if model_type == "openai":
             self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-            self.model_name = "gpt-4o-mini"
+            self.model_name = OPENAI_LLM_MODEL
         else:
-            self.client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
-            self.model_name = "llama3.2"
+            self.client = OpenAI(base_url=OLLAMA_BASE_URL, api_key=OLLAMA_API_KEY)
+            self.model_name = OLLAMA_LLM_MODEL
 
     def generate_completion(self, messages):
         try:
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
-                max_tokens=500,
-                temperature=0.7
+                max_tokens=MAX_TOKENS,
+                temperature=TEMPERATURE
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -59,9 +79,9 @@ def load_csv():
     """Load all .csv files from directory for company documents - handles any CSV structure"""
     all_csvs = []
     
-    csv_files = [f for f in os.listdir(directory_path) if f.endswith('.csv')]
+    csv_files = [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(FileExtensions.CSV.value)]
     for csv_file in csv_files:     
-        file_path = os.path.join(directory_path, csv_file)   
+        file_path = os.path.join(DATA_DIRECTORY, csv_file)   
         try:
             df = pd.read_csv(file_path)
             
@@ -88,11 +108,29 @@ def load_pdf():
     # TODO: Implement PDF parsing for company procedures and policies
     # This will be needed for technical documentation, employee handbooks, etc.
     documents = []
-    pdf_files = [f for f in os.listdir(directory_path) if f.endswith('.pdf')]
+    pdf_files = [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(FileExtensions.PDF.value)]
     
     for pdf_file in pdf_files:
         # Future implementation with PyPDF2 or similar
         print(f"PDF support coming soon for: {pdf_file}")
+    
+    return documents
+
+def load_txt_files():
+    """Load all .txt files from directory for company documents"""
+    documents = []
+    txt_files = [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(FileExtensions.TXT.value)]
+    
+    for file_name in txt_files:
+        file_path = os.path.join(DATA_DIRECTORY, file_name)
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                content = file.read().strip()
+                if content:
+                    documents.append(content)
+                    print(f"Loaded document from {file_name}: {content[:100]}...")
+        except Exception as e:
+            print(f"Error loading {file_name}: {str(e)}")
     
     return documents
 
@@ -112,41 +150,23 @@ def load_all_company_documents():
     print(f"Total company documents loaded: {len(all_documents)}")
     return all_documents
 
-def load_txt_files():
-    """Load all .txt files from directory for company documents"""
-    documents = []
-    txt_files = [f for f in os.listdir(directory_path) if f.endswith('.txt')]
-    
-    for file_name in txt_files:
-        file_path = os.path.join(directory_path, file_name)
-        try:
-            with open(file_path, 'r', encoding='utf-8') as file:
-                content = file.read().strip()
-                if content:
-                    documents.append(content)
-                    print(f"Loaded document from {file_name}: {content[:100]}...")
-        except Exception as e:
-            print(f"Error loading {file_name}: {str(e)}")
-    
-    return documents
-
 def setup_chroma(documents, embedding_model):
     client = chromadb.Client()
     try:
-        client.delete_collection("company_knowledge")
+        client.delete_collection(COMPANY_KNOWLEDGE_COLLECTION)
     except:
         pass
 
     collection = client.create_collection(
-        name="company_knowledge", embedding_function=embedding_model.embedding_fn
+        name=COMPANY_KNOWLEDGE_COLLECTION, embedding_function=embedding_model.embedding_fn
     )
 
     collection.add(documents=documents, ids=[str(i) for i in range(len(documents))])
-    print(f"Collection 'company_knowledge' created with {len(documents)} documents.")
+    print(f"Collection {COMPANY_KNOWLEDGE_COLLECTION} created with {len(documents)} documents.")
     
     return collection
 
-def find_related_chunks(query, collection, top_k=2):
+def find_related_chunks(query, collection, top_k=TOP_K_RESULTS):
     results = collection.query(query_texts=[query], n_results=top_k) 
 
     for doc in results['documents'][0]:
@@ -222,10 +242,7 @@ def streamlit_app():
     if (st.session_state.llm_model.model_type == llm_type
         or st.session_state.embedding_model.model_type == embedding_type):
         st.session_state.llm_model = LLMModel(llm_type)
-        st.session_state.embedding_model = EmbeddingModel(embedding_type)
-    
-
-   
+        st.session_state.embedding_model = EmbeddingModel(embedding_type)  
 
     with st.expander("📁 Available Company Knowledge", expanded=False):
         for i, doc in enumerate(st.session_state.documents):
