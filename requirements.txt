@@ -4,3 +4,5 @@ transformers
 cromadb
 streamlit
 pandas
+python-dotenv
+PyPDF2
