@@ -7,6 +7,8 @@ from openai import OpenAI
 import os 
 from dotenv import load_dotenv
 from enum import Enum
+import PyPDF2
+from io import BytesIO
 
 class FileExtensions(Enum):
     CSV = ".csv"
@@ -19,6 +21,10 @@ COMPANY_KNOWLEDGE_COLLECTION = "company_knowledge"
 MAX_TOKENS = 500
 TEMPERATURE = 0.3
 TOP_K_RESULTS = 2
+
+# PDF processing
+PDF_CHUNK_SIZE = 1000  
+PDF_OVERLAP = 200      
 
 # Model configuration constants
 OPENAI_EMBEDDING_MODEL = "text-embedding-ada-002"
@@ -75,6 +81,108 @@ class LLMModel:
         )
         return response['data'][0]['embedding']
 
+def extract_text_from_pdf(pdf_path):
+    """Extract text from PDF file"""
+    try:
+        text_content = ""
+        
+        with open(pdf_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            
+            for page_num, page in enumerate(pdf_reader.pages, 1):
+                try:
+                    page_text = page.extract_text()
+                    if page_text.strip():
+                        text_content += f"\n--- Page {page_num} ---\n{page_text}\n"
+                except Exception as e:
+                    print(f"Error extracting text from page {page_num} in {pdf_path}: {str(e)}")
+                    continue
+        
+        return text_content.strip()
+    
+    except Exception as e:
+        print(f"Error reading PDF {pdf_path}: {str(e)}")
+        return None
+
+def chunk_pdf_text(text, chunk_size=PDF_CHUNK_SIZE, overlap=PDF_OVERLAP):
+    """Split large PDF text into manageable chunks for RAG processing"""
+    if not text or len(text) <= chunk_size:
+        return [text] if text else []
+    
+    chunks = []
+    start = 0
+    
+    while start < len(text):
+        end = start + chunk_size
+        
+        if end < len(text):
+            for i in range(min(100, chunk_size // 4)):
+                if end - i > start and text[end - i] in ['.', '!', '?', '\n\n']:
+                    end = end - i + 1
+                    break
+        
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        
+        start = end - overlap if end < len(text) else len(text)
+
+    return chunks
+
+def load_pdf():
+    """Load all .pdf files from directory"""
+    documents = []
+    pdf_files = [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(FileExtensions.PDF.value)]
+    
+    if not pdf_files:
+        print("No PDF files found in company data directory")
+        return documents
+    
+    for pdf_file in pdf_files:
+        file_path = os.path.join(DATA_DIRECTORY, pdf_file)
+        print(f"Processing company PDF: {pdf_file}")
+        
+        pdf_text = extract_text_from_pdf(file_path)
+        
+        if pdf_text:
+            if len(pdf_text) > PDF_CHUNK_SIZE:
+                chunks = chunk_pdf_text(pdf_text)
+                
+                for i, chunk in enumerate(chunks, 1):
+                    chunk_with_metadata = f"Source: {pdf_file} (Part {i}/{len(chunks)})\n\n{chunk}"
+                    documents.append(chunk_with_metadata)
+                    print(f"Loaded PDF chunk {i}/{len(chunks)} from {pdf_file}: {chunk[:100]}...")
+            else:
+                doc_with_metadata = f"Source: {pdf_file}\n\n{pdf_text}"
+                documents.append(doc_with_metadata)
+                print(f"Loaded complete PDF from {pdf_file}: {pdf_text[:100]}...")
+        else:
+            print(f"Failed to extract text from {pdf_file}")
+    
+    print(f"Successfully loaded {len(documents)} PDF document chunks for company RAG")
+    return documents
+
+def validate_pdf_processing():
+    """Validate PDF processing functionality for company RAG system"""
+    pdf_files = [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(FileExtensions.PDF.value)]
+    
+    if not pdf_files:
+        return False, "No PDF files found in company data directory"
+    
+    for pdf_file in pdf_files:
+        file_path = os.path.join(DATA_DIRECTORY, pdf_file)
+        
+        # Check if file is readable
+        try:
+            with open(file_path, 'rb') as f:
+                pdf_reader = PyPDF2.PdfReader(f)
+                if len(pdf_reader.pages) == 0:
+                    return False, f"PDF {pdf_file} appears to be empty"
+        except Exception as e:
+            return False, f"Cannot read PDF {pdf_file}: {str(e)}"
+    
+    return True, f"All {len(pdf_files)} PDF files are valid for processing"
+
 def load_csv():
     """Load all .csv files from directory for company documents - handles any CSV structure"""
     all_csvs = []
@@ -103,19 +211,6 @@ def load_csv():
     
     return all_csvs
 
-def load_pdf():
-    """Load all .pdf files from directory for company documents"""
-    # TODO: Implement PDF parsing for company procedures and policies
-    # This will be needed for technical documentation, employee handbooks, etc.
-    documents = []
-    pdf_files = [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(FileExtensions.PDF.value)]
-    
-    for pdf_file in pdf_files:
-        # Future implementation with PyPDF2 or similar
-        print(f"PDF support coming soon for: {pdf_file}")
-    
-    return documents
-
 def load_txt_files():
     """Load all .txt files from directory for company documents"""
     documents = []
@@ -138,16 +233,25 @@ def load_all_company_documents():
     """Load all supported document types for the RAG system"""
     all_documents = []
     
+    pdf_valid, pdf_message = validate_pdf_processing()
+    print(f"PDF Validation: {pdf_message}")
+    
     csv_docs = load_csv()
     all_documents.extend(csv_docs)
+    print(f"Loaded {len(csv_docs)} CSV documents")
     
     txt_docs = load_txt_files()
     all_documents.extend(txt_docs)
+    print(f"Loaded {len(txt_docs)} TXT documents")
     
-    pdf_docs = load_pdf()
-    all_documents.extend(pdf_docs)
+    if pdf_valid:
+        pdf_docs = load_pdf()
+        all_documents.extend(pdf_docs)
+        print(f"Loaded {len(pdf_docs)} PDF document chunks")
+    else:
+        print("Skipping PDF processing due to validation issues")
     
-    print(f"Total company documents loaded: {len(all_documents)}")
+    print(f"Total company documents loaded for RAG: {len(all_documents)}")
     return all_documents
 
 def setup_chroma(documents, embedding_model):
@@ -223,61 +327,94 @@ def streamlit_app():
         }[x],
     )
 
-    if "initialized" not in st.session_state:
+    if st.sidebar.button("Refresh Document Stats"):
+        csv_files = [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(FileExtensions.CSV.value)]
+        txt_files = [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(FileExtensions.TXT.value)]
+        pdf_files = [f for f in os.listdir(DATA_DIRECTORY) if f.endswith(FileExtensions.PDF.value)]
+        
+        st.sidebar.write(f"📊 **Document Statistics:**")
+        st.sidebar.write(f"CSV files: {len(csv_files)}")
+        st.sidebar.write(f"TXT files: {len(txt_files)}")
+        st.sidebar.write(f"PDF files: {len(pdf_files)}")
+
+    if "initialized" not in st.session_state or st.sidebar.button("Reload Documents"):
         st.session_state.initialized = False
         
-        all_documents = load_all_company_documents()
-        
-        if not all_documents:
-            st.warning("No documents found. Please generate sample data or add CSV/TXT files.")
-            return
+        with st.spinner("Loading company documents..."):
+            all_documents = load_all_company_documents()
             
-        st.session_state.documents = all_documents
+            if not all_documents:
+                st.warning("No documents found. Please add csv, txt or pdf files to the data directory.")
+                return
+                
+            st.session_state.documents = all_documents
+            st.session_state.llm_model = LLMModel(llm_type)
+            st.session_state.embedding_model = EmbeddingModel(embedding_type)
+
+            st.session_state.collection = setup_chroma(all_documents, st.session_state.embedding_model)
+            st.session_state.initialized = True
+            
+            st.success(f"Loaded {len(all_documents)} company documents.")
+
+    if not st.session_state.get('initialized', False):
+        st.info("Please load company documents to start using the RAG system.")
+        return
+
+    # Update models if selection changed
+    if (st.session_state.llm_model.model_type != llm_type or 
+        st.session_state.embedding_model.model_type != embedding_type):
         st.session_state.llm_model = LLMModel(llm_type)
         st.session_state.embedding_model = EmbeddingModel(embedding_type)
 
-        st.session_state.collection = setup_chroma(all_documents, st.session_state.embedding_model)
-        st.session_state.initialized = True
-
-    if (st.session_state.llm_model.model_type == llm_type
-        or st.session_state.embedding_model.model_type == embedding_type):
-        st.session_state.llm_model = LLMModel(llm_type)
-        st.session_state.embedding_model = EmbeddingModel(embedding_type)  
-
     with st.expander("📁 Available Company Knowledge", expanded=False):
+        pdf_count = sum(1 for doc in st.session_state.documents if "Source:" in doc and ".pdf" in doc)
+        csv_count = sum(1 for doc in st.session_state.documents if not ("Source:" in doc and ".pdf" in doc))
+        
+        st.write(f"**Document Summary:** {len(st.session_state.documents)} total documents")
+        st.write(f"📄 PDF documents: {pdf_count} chunks")
+        st.write(f"📝 CSV/TXT documents: {csv_count}")
+        
         for i, doc in enumerate(st.session_state.documents):
-            st.write(f"**Document {i+1}:** {doc[:150]}...")
+            if "Source:" in doc and ".pdf" in doc:
+                st.write(f"📄 **PDF Document {i+1}:** {doc[:200]}...")
+            else:
+                st.write(f"📝 **Document {i+1}:** {doc[:150]}...")
 
-        st.markdown("### 💬 Ask Questions About Company Procedures & Policies")
-        query = st.text_input(
-            "Enter your question:", 
-            placeholder="e.g., What is the remote work policy? How does code review work?"
-        )
+    st.markdown("### 💬 Ask Questions About Company Knowledge")
+    query = st.text_input(
+        "Enter your question:", 
+        placeholder="e.g., What does the employee handbook say about vacation?"
+    )
 
-        if query:
-            with st.spinner("Processing your query..."):
-                response, reference, augmented_prompt = rag_pipeline( 
-                    query, 
-                    st.session_state.collection, 
-                    st.session_state.llm_model
-                )
+    if query:
+        with st.spinner("Searching company documents..."):
+            response, references, augmented_prompt = rag_pipeline( 
+                query, 
+                st.session_state.collection, 
+                st.session_state.llm_model
+            )
 
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown("### Response")
-                    st.write(response)
-                with col2:
-                    st.markdown("### References Used")
-                    for ref in reference:
-                        st.write(f"- {ref}")
-                
-                with st.expander("Technical Details", expanded=False):
-                    st.markdown("### Augmented Prompt")
-                    st.code(augmented_prompt)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("### 📝 Response")
+                st.write(response)
+            with col2:
+                st.markdown("### 📚 References Used")
+                for ref in references:
+                    if "Source:" in ref and ".pdf" in ref:
+                        st.write(f"📄 PDF: {ref[:200]}...")
+                    else:
+                        st.write(f"📝 Document: {ref[:150]}...")
+            
+            with st.expander("🔧 Technical Details", expanded=False):
+                st.markdown("### Augmented Prompt")
+                st.code(augmented_prompt)
 
-                    st.markdown("### Model Configuration")
-                    st.write(f"LLM Model: {llm_type.upper()}")
-                    st.write(f"Embedding Model: {embedding_type.upper()}")
+                st.markdown("### Model Configuration")
+                st.write(f"LLM Model: {llm_type.upper()}")
+                st.write(f"Embedding Model: {embedding_type.upper()}")
+                st.write(f"Total Documents: {len(st.session_state.documents)}")
+                st.write(f"PDF Chunks: {sum(1 for doc in st.session_state.documents if 'Source:' in doc and '.pdf' in doc)}")
 
 if __name__ == "__main__":
     streamlit_app()
