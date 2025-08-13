@@ -22,7 +22,7 @@ class EmbeddingModel:
             self.embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
                 api_key="ollama",
                 api_base="http://localhost:11434/v1",
-                model_name="nomic-embed-text", # you can find this in ollama websites searching for models for embeddings
+                model_name="nomic-embed-text", 
             )
 
 class LLMModel:
@@ -53,49 +53,50 @@ class LLMModel:
             model=self.model_name
         )
         return response['data'][0]['embedding']
+
+def load_csv(file_path):
+    df = pd.read_csv(file_path)
+    text_columns = df.select_dtypes(include=['object']).columns
+    if len(text_columns) > 0:
+        documents = df[text_columns[0]].tolist()
+    else:
+        documents = []
     
-def generate_csv(): 
-    facts = [
-        {"id": 1, "fact": "The Sun accounts for about 99.86% of the total mass of the Solar System."},
-        {"id": 2, "fact": "A day on Venus is longer than a year on Venus. It takes about 243 Earth days to rotate once on its axis, but only about 225 Earth days to orbit the Sun."},
-        {"id": 3, "fact": "Jupiter is so large that it could fit all the other planets inside it. It is more than 11 times the diameter of Earth."},
-        {"id": 4, "fact": "Saturn's rings are made mostly of ice particles, with a smaller amount of rocky debris and dust."},
-        {"id": 5, "fact": "Mars has the largest volcano in the Solar System, Olympus Mons, which is about 13.6 miles (22 kilometers) high."},
-        {"id": 6, "fact": "Neptune has the strongest winds in the Solar System, with speeds reaching up to 1,200 miles per hour (2,000 kilometers per hour)."},
-        {"id": 7, "fact": "Pluto was reclassified as a dwarf planet in 2006 by the International Astronomical Union."},
-        {"id": 8, "fact": "The Voyager spacecraft have traveled farther than any other human-made objects in space."},
-        {"id": 9, "fact": "A year on Mercury is only about 88 Earth days long."},
-        {"id": 10, "fact": "The Great Red Spot on Jupiter is a giant storm that has been raging for at least 350 years."}
-    ]
+    for doc in documents:
+        print (f"Loaded document: {doc}")
+    return documents
 
-    with open("space_facts.csv", mode="w", newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=["id", "fact"])
-        writer.writeheader()
-        writer.writerows(facts)
-
-    return facts
-
-
-# def load_csv(file_path):
-#     df = pd.read_csv(file_path)
-#     documents = df['fact'].tolist()
-#     for doc in documents:
-#         print (f"Loaded document: {doc}")
-#     return documents
+def load_txt_files(directory_path="./data"):
+    """Load all .txt files from directory for company documents"""
+    documents = []
+    txt_files = [f for f in os.listdir(directory_path) if f.endswith('.txt')]
+    
+    for file_name in txt_files:
+        file_path = os.path.join(directory_path, file_name)
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                content = file.read().strip()
+                if content:
+                    documents.append(content)
+                    print(f"Loaded document from {file_name}: {content[:100]}...")
+        except Exception as e:
+            print(f"Error loading {file_name}: {str(e)}")
+    
+    return documents
 
 def setup_chroma(documents, embedding_model):
     client = chromadb.Client()
     try:
-        client.delete_collection("space_facts")
+        client.delete_collection("company_knowledge")
     except:
         pass
 
     collection = client.create_collection(
-        name="space_facts", embedding_function=embedding_model.embedding_fn
+        name="company_knowledge", embedding_function=embedding_model.embedding_fn
     )
 
     collection.add(documents=documents, ids=[str(i) for i in range(len(documents))])
-    print(f"Collection 'space_facts' created with {len(documents)} documents.")
+    print(f"Collection 'company_knowledge' created with {len(documents)} documents.")
     
     return collection
 
@@ -137,8 +138,8 @@ def rag_pipeline(query, collection, llm_model, top_k=2):
     return response, references, augmented_prompt
 
 def streamlit_app():
-    st.set_page_config(page_title="Space Facts RAG", layout="wide")
-    st.title("Space Facts RAG System")
+    st.set_page_config(page_title="Company Knowledge RAG", layout="wide")
+    st.title("🏢 Company Knowledge RAG System")
     
     st.sidebar.title("Model Configuration")
     llm_type = st.sidebar.radio(
@@ -158,13 +159,26 @@ def streamlit_app():
 
     if "initialized" not in st.session_state:
         st.session_state.initialized = False
-        st.session_state.facts = generate_csv()
         
+        all_documents = []
+        
+        csv_files = [f for f in os.listdir('.') if f.endswith('.csv')]
+        for csv_file in csv_files:
+            csv_docs = load_csv(csv_file)
+            all_documents.extend(csv_docs)
+    
+        txt_docs = load_txt_files()
+        all_documents.extend(txt_docs)
+        
+        if not all_documents:
+            st.warning("No documents found. Please generate sample data or add CSV/TXT files.")
+            return
+            
+        st.session_state.documents = all_documents
         st.session_state.llm_model = LLMModel(llm_type)
         st.session_state.embedding_model = EmbeddingModel(embedding_type)
 
-        documents = [fact["fact"] for fact in st.session_state.facts]
-        st.session_state.collection = setup_chroma(documents, st.session_state.embedding_model)
+        st.session_state.collection = setup_chroma(all_documents, st.session_state.embedding_model)
         st.session_state.initialized = True
 
     if (st.session_state.llm_model.model_type == llm_type
@@ -172,11 +186,19 @@ def streamlit_app():
         st.session_state.llm_model = LLMModel(llm_type)
         st.session_state.embedding_model = EmbeddingModel(embedding_type)
     
-    with st.expander("Available Space Facts", expanded=False):
-        for fact in st.session_state.facts:
-            st.write(f"- {fact['fact']}")
 
-        query = st.text_input("Enter your question about space:", placeholder="e.g., What is the largest planet in our solar system?")
+   
+
+    with st.expander("📁 Available Company Knowledge", expanded=False):
+        for i, doc in enumerate(st.session_state.documents):
+            st.write(f"**Document {i+1}:** {doc[:150]}...")
+
+        st.markdown("### 💬 Ask Questions About Company Procedures & Policies")
+        query = st.text_input(
+            "Enter your question:", 
+            placeholder="e.g., What is the remote work policy? How does code review work?"
+        )
+
         if query:
             with st.spinner("Processing your query..."):
                 response, reference, augmented_prompt = rag_pipeline( 
