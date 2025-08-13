@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 load_dotenv()
+directory_path="./data"
 
 class EmbeddingModel:
     def __init__(self, model_type="openai"):
@@ -54,19 +55,64 @@ class LLMModel:
         )
         return response['data'][0]['embedding']
 
-def load_csv(file_path):
-    df = pd.read_csv(file_path)
-    text_columns = df.select_dtypes(include=['object']).columns
-    if len(text_columns) > 0:
-        documents = df[text_columns[0]].tolist()
-    else:
-        documents = []
+def load_csv():
+    """Load all .csv files from directory for company documents - handles any CSV structure"""
+    all_csvs = []
     
-    for doc in documents:
-        print (f"Loaded document: {doc}")
+    csv_files = [f for f in os.listdir(directory_path) if f.endswith('.csv')]
+    for csv_file in csv_files:     
+        file_path = os.path.join(directory_path, csv_file)   
+        try:
+            df = pd.read_csv(file_path)
+            
+            for index, row in df.iterrows():
+                doc_parts = []
+                
+                for column, value in row.items():
+                    if pd.notna(value) and str(value).strip():
+                        doc_parts.append(f"{column}: {value}")
+                
+                if doc_parts:
+                    doc_content = "\n".join(doc_parts)
+                    all_csvs.append(doc_content)
+                    print(f"Loaded CSV document from {csv_file}: {doc_content[:100]}...")
+                    
+        except Exception as e:
+            print(f"Error loading CSV {csv_file}: {str(e)}")
+            continue
+    
+    return all_csvs
+
+def load_pdf():
+    """Load all .pdf files from directory for company documents"""
+    # TODO: Implement PDF parsing for company procedures and policies
+    # This will be needed for technical documentation, employee handbooks, etc.
+    documents = []
+    pdf_files = [f for f in os.listdir(directory_path) if f.endswith('.pdf')]
+    
+    for pdf_file in pdf_files:
+        # Future implementation with PyPDF2 or similar
+        print(f"PDF support coming soon for: {pdf_file}")
+    
     return documents
 
-def load_txt_files(directory_path="./data"):
+def load_all_company_documents():
+    """Load all supported document types for the RAG system"""
+    all_documents = []
+    
+    csv_docs = load_csv()
+    all_documents.extend(csv_docs)
+    
+    txt_docs = load_txt_files()
+    all_documents.extend(txt_docs)
+    
+    pdf_docs = load_pdf()
+    all_documents.extend(pdf_docs)
+    
+    print(f"Total company documents loaded: {len(all_documents)}")
+    return all_documents
+
+def load_txt_files():
     """Load all .txt files from directory for company documents"""
     documents = []
     txt_files = [f for f in os.listdir(directory_path) if f.endswith('.txt')]
@@ -160,15 +206,7 @@ def streamlit_app():
     if "initialized" not in st.session_state:
         st.session_state.initialized = False
         
-        all_documents = []
-        
-        csv_files = [f for f in os.listdir('.') if f.endswith('.csv')]
-        for csv_file in csv_files:
-            csv_docs = load_csv(csv_file)
-            all_documents.extend(csv_docs)
-    
-        txt_docs = load_txt_files()
-        all_documents.extend(txt_docs)
+        all_documents = load_all_company_documents()
         
         if not all_documents:
             st.warning("No documents found. Please generate sample data or add CSV/TXT files.")
