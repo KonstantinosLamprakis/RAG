@@ -6,3 +6,4 @@ Tips on Writing Clean Code:
 5. Avoid deeply nested loops and conditions.
 6. Follow DRY (Don't Repeat Yourself) and KISS (Keep It Simple, Stupid) principles.
 7. Review code through peer reviews before merging.
+8. Avoid mutating variables after the initialization.
