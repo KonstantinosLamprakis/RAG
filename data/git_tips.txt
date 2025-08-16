@@ -7,3 +7,4 @@ Tips on Using Git:
 6. Use 'git stash' to temporarily save work in progress.
 7. Delete merged branches to keep repository tidy.
 8. Useful commands: git stash push -m "" to add message in stash, git cherry-pick to pick a spesific commit
+9. Do not use UI wrappers. First make sure you truly are comfortable with CLI and understand git deeply.
