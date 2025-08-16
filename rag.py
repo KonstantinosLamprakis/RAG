@@ -24,8 +24,8 @@ DATA_DIRECTORY = "./data"
 COMPANY_KNOWLEDGE_COLLECTION = "company_knowledge"
 PERSISTENT_DB_PATH = "./chroma_db"  # Persistent database path
 FILE_METADATA_PATH = "./file_metadata.json"  # File tracking metadata
-MAX_TOKENS = 500
-TEMPERATURE = 0.1
+MAX_TOKENS = 800
+TEMPERATURE = 0
 TOP_K_RESULTS = 2
 
 # PDF processing
@@ -411,27 +411,27 @@ def find_related_chunks(query, collection, top_k=TOP_K_RESULTS):
         results['metadatas'][0] if results['metadatas'][0] else [{}] * len(results['documents'][0])
     ))
 
-def augment_prompt(query, related_chunks):
-    """Create augmented prompt with context from documents"""
-    context = "\n".join(chunk[0] for chunk in related_chunks)
-    augmented_prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
-    return augmented_prompt
-
 def rag_pipeline(query, collection, llm_model, top_k=TOP_K_RESULTS):
-    """Execute RAG pipeline for company knowledge queries"""
-    print(f"Running RAG pipeline for query: {query}")
+    """Execute RAG pipeline with conversation history"""
     related_chunks = find_related_chunks(query, collection, top_k)
-    augmented_prompt = augment_prompt(query, related_chunks)
+    context = "\n".join(chunk[0] for chunk in related_chunks)
 
-    response = llm_model.generate_completion([
-        {"role": "system", "content": "You are a helpful assistant for company knowledge and procedures."},
-        {"role": "user", "content": augmented_prompt},
-    ])
+    messages = [{"role": "system", "content": "You are a helpful assistant for company knowledge and procedures."}]
+    for msg in st.session_state.chat_history:
+        messages.append(msg)
+    
+    augmented_prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
+    messages.append({"role": "user", "content": augmented_prompt})
+
+    response = llm_model.generate_completion(messages)
 
     references = [chunk[0] for chunk in related_chunks]
     return response, references, augmented_prompt
 
 def streamlit_app():
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
     st.set_page_config(page_title="Company Knowledge RAG", layout="wide")
     st.title("🏢 Company Knowledge RAG System with Persistent Storage")
     
@@ -561,6 +561,9 @@ def streamlit_app():
                     st.session_state.llm_model
                 )
 
+                st.session_state.chat_history.append({"role": "user", "content": query})
+                st.session_state.chat_history.append({"role": "assistant", "content": response})
+
                 col1, col2 = st.columns(2)
                 with col1:
                     st.markdown("### 📝 Response")
@@ -578,7 +581,15 @@ def streamlit_app():
                     st.markdown("### Model Configuration")
                     st.write(f"LLM Model: {llm_type.upper()}")
                     st.write(f"Embedding Model: {embedding_type.upper()}")
-                    
+    
+                with st.expander("💬 Chat History", expanded=False):
+                    for msg in st.session_state.chat_history:
+                        if msg["role"] == "user":
+                            st.write(f"👤 **Employee:** {msg['content']}")
+                        else:
+                            st.write(f"🤖 **Company Assistant:** {msg['content']}")
+
+                        
             except Exception as e:
                 st.error(f"Error processing query: {e}")
 
