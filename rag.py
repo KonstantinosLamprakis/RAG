@@ -50,7 +50,7 @@ load_dotenv()
 class DocumentManager:
     """Manages document processing and metadata tracking for company RAG system"""
     
-    def __init__(self, data_directory=DATA_DIRECTORY, metadata_path=FILE_METADATA_PATH):
+    def __init__(self, data_directory, metadata_path):
         self.data_directory = data_directory
         self.metadata_path = metadata_path
         self.file_metadata = self.load_file_metadata()
@@ -157,7 +157,7 @@ class DocumentManager:
             self.save_file_metadata()
 
 class EmbeddingModel:
-    def __init__(self, model_type=EmbeddingsType.OPENAI.value):
+    def __init__(self, model_type):
         self.model_type = model_type
         if model_type == EmbeddingsType.OPENAI.value:
             self.client = OpenAI(api_key=os.getenv(OPENAI_API_KEY_ENV_VAR))
@@ -167,7 +167,7 @@ class EmbeddingModel:
             )
 
 class LLMModel:
-    def __init__(self, model_type=LLMType.OPENAI.value):
+    def __init__(self, model_type):
         self.model_type = model_type
         if model_type == LLMType.OPENAI.value:
             self.client = OpenAI(api_key=os.getenv(OPENAI_API_KEY_ENV_VAR))
@@ -204,7 +204,7 @@ def setup_persistent_chroma(embedding_model):
     
     return collection
 
-def generate_document_id(file_path, chunk_index=0):
+def generate_document_id(file_path, chunk_index):
     """Generate unique document ID for vector storage"""
     return f"{file_path}::chunk_{chunk_index}"
 
@@ -227,7 +227,7 @@ def extract_text_from_pdf(pdf_path):
         print(f"Error reading PDF {pdf_path}: {str(e)}")
         return None
 
-def chunk_pdf_text(text, chunk_size=PDF_CHUNK_SIZE, overlap=PDF_OVERLAP):
+def chunk_pdf_text(text, chunk_size, overlap):
     """Split large PDF text into manageable chunks for RAG processing"""
     if not text or len(text) <= chunk_size:
         return [text] if text else []
@@ -297,7 +297,7 @@ def process_file_for_rag(file_path, file_info):
             pdf_text = extract_text_from_pdf(file_path)
             if pdf_text:
                 if len(pdf_text) > PDF_CHUNK_SIZE:
-                    chunks = chunk_pdf_text(pdf_text)
+                    chunks = chunk_pdf_text(pdf_text, PDF_CHUNK_SIZE, PDF_OVERLAP)
                     for i, chunk in enumerate(chunks):
                         documents.append({
                             'content': chunk,
@@ -391,7 +391,7 @@ def update_vector_database(collection, doc_manager):
     print(f"Vector database update complete. Processed {total_processed} files.")
     return total_processed
 
-def find_related_chunks(query, collection, top_k=TOP_K_RESULTS, similarity_threshold=MAX_RELEVANCE_DISTANCE):
+def find_related_chunks(query, collection, top_k, similarity_threshold):
     """Find related document chunks with similarity filtering"""
     results = collection.query(
         query_texts=[query], 
@@ -406,7 +406,7 @@ def find_related_chunks(query, collection, top_k=TOP_K_RESULTS, similarity_thres
 
     return filtered
 
-def rag_pipeline(query, collection, llm_model, top_k=TOP_K_RESULTS, max_relevance_distance=MAX_RELEVANCE_DISTANCE):
+def rag_pipeline(query, collection, llm_model, top_k, max_relevance_distance):
     """Execute RAG pipeline with conversation history"""
     related_chunks = find_related_chunks(query, collection, top_k, max_relevance_distance)
     context = "\n".join(chunk[0] for chunk in related_chunks)
@@ -448,7 +448,7 @@ def streamlit_app():
     st.title("🏢 Company Knowledge RAG System with Persistent Storage")
     
     if 'doc_manager' not in st.session_state:
-        st.session_state.doc_manager = DocumentManager()
+        st.session_state.doc_manager = DocumentManager(DATA_DIRECTORY, FILE_METADATA_PATH)
     
     st.sidebar.title("Vector Database Management")
     if st.sidebar.button("🔄 Update Vector Database"):
@@ -543,7 +543,9 @@ def streamlit_app():
                 response, references, augmented_prompt = rag_pipeline(
                     query, 
                     st.session_state.collection, 
-                    st.session_state.llm_model
+                    st.session_state.llm_model,
+                    TOP_K_RESULTS,
+                    MAX_RELEVANCE_DISTANCE
                 )
 
                 st.session_state.chat_history.append({"role": "user", "content": query})
