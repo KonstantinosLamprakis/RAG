@@ -6,3 +6,6 @@ Structure of the Codebase:
 5. Docker used for containerization of services.
 6. CI/CD pipelines managed through GitHub Actions.
 7. Shared libraries located in /libs directory.
+8. Cypress is used for UI component tests. Vitest is used for functionality testing.
+9. The pipelines deploy in prod every day at 16.00. The deploy on dev every 1 hour and on tst every 3 hours.
+
