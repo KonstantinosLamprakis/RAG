@@ -27,6 +27,7 @@ FILE_METADATA_PATH = "./file_metadata.json"  # File tracking metadata
 MAX_TOKENS = 800
 TEMPERATURE = 0
 TOP_K_RESULTS = 2
+MAX_RELEVANCE_DISTANCE = 0.55
 
 # PDF processing
 PDF_CHUNK_SIZE = 1000  
@@ -399,24 +400,28 @@ def update_vector_database(collection, doc_manager):
     print(f"Vector database update complete. Processed {total_processed} files.")
     return total_processed
 
-def find_related_chunks(query, collection, top_k=TOP_K_RESULTS):
-    """Find related document chunks using vector similarity search"""
-    results = collection.query(query_texts=[query], n_results=top_k)
-    
-    for doc in results['documents'][0]:
-        print(f"Found related document: {doc[:100]}...")
+def find_related_chunks(query, collection, top_k=TOP_K_RESULTS, similarity_threshold=0.3):
+    """Find related document chunks with similarity filtering"""
+    results = collection.query(
+        query_texts=[query], 
+        n_results=top_k,
+        include=["documents", "metadatas", "distances"]
+    )
 
-    return list(zip(
-        results['documents'][0], 
-        results['metadatas'][0] if results['metadatas'][0] else [{}] * len(results['documents'][0])
-    ))
+    filtered = []
+    for doc, meta, dist in zip(results["documents"][0], results["metadatas"][0], results["distances"][0]):
+        print(f"Dist: {dist}")
+        if dist <= similarity_threshold: 
+            filtered.append((doc, meta))
 
-def rag_pipeline(query, collection, llm_model, top_k=TOP_K_RESULTS):
+    return filtered
+
+def rag_pipeline(query, collection, llm_model, top_k=TOP_K_RESULTS, max_relevance_distance=MAX_RELEVANCE_DISTANCE):
     """Execute RAG pipeline with conversation history"""
-    related_chunks = find_related_chunks(query, collection, top_k)
+    related_chunks = find_related_chunks(query, collection, top_k, max_relevance_distance)
     context = "\n".join(chunk[0] for chunk in related_chunks)
 
-    messages = [{"role": "system", "content": "You are a helpful assistant for company knowledge and procedures."}]
+    messages = [{"role": "system", "content": "You are a helpful assistant for company knowledge and procedures. Only answer using the provided context. If there is no relevant information, respond with 'I don't have answer for this.'."}]
     for msg in st.session_state.chat_history:
         messages.append(msg)
     
