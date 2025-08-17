@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  company-rag:
+    build: .
+    container_name: company-knowledge-rag
+    ports:
+      - "8501:8501" # Streamlit port for employee queries
+    volumes:
+      - ./data:/app/data # Company documents
+      - ./chroma_db:/app/chroma_db # vector database
+      - ./file_metadata.json:/app/file_metadata.json # File metadata tracking for document changes
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped
+    healthcheck: # auto-restart if unhealthy
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  company-data:
+    driver: local
+  chroma-db:
+    driver: local
