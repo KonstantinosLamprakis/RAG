@@ -37,9 +37,12 @@ def rag_pipeline(query, collection, llm_model: LLMModel, top_k: int, max_relevan
     context = "\n".join(chunk[0] for chunk in related_chunks)
 
     messages = [{"role": "system", "content": "You are a helpful assistant for company knowledge and procedures. Only answer using the provided context. If there is no relevant information, respond with 'I don't have answer for this.'."}]
-    for msg in st.session_state.chat_history:
-        messages.append(msg)
     
+    if hasattr(st, 'session_state') and hasattr(st.session_state, 'chat_history'):
+        for msg in st.session_state.chat_history:
+            messages.append(msg)
+    else:
+        pass
     augmented_prompt = f"Context:\n{context}\n\nQuestion: {query}\nAnswer:"
     messages.append({"role": "user", "content": augmented_prompt})
 

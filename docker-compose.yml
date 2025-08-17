@@ -10,8 +10,8 @@ services:
       - ./data:/app/data # Company documents
       - ./chroma_db:/app/chroma_db # vector database
       - ./file_metadata.json:/app/file_metadata.json # File metadata tracking for document changes
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    env_file:
+      .env
     restart: unless-stopped
     healthcheck: # auto-restart if unhealthy
       test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
