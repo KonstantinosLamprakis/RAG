@@ -3,9 +3,10 @@ import chromadb
 from config import (
     PERSISTENT_DB_PATH, COMPANY_KNOWLEDGE_COLLECTION
 )
-from document_manager import process_file_for_rag, generate_document_id
+from document_manager import process_file_for_rag, generate_document_id, DocumentManager
+from models import EmbeddingModel
 
-def setup_persistent_chroma(embedding_model):
+def setup_persistent_chroma(embedding_model: EmbeddingModel):
     """Setup persistent ChromaDB with embeddings"""
     client = chromadb.PersistentClient(path=PERSISTENT_DB_PATH)
     
@@ -24,7 +25,7 @@ def setup_persistent_chroma(embedding_model):
     
     return collection
 
-def update_vector_database(collection, doc_manager):
+def update_vector_database(collection, doc_manager: DocumentManager):
     """Update vector database with changed files"""
     changed_files = doc_manager.get_changed_files()
     

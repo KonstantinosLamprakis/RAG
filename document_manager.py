@@ -11,7 +11,7 @@ from config import ( FileExtensions,PDF_CHUNK_SIZE, PDF_OVERLAP)
 class DocumentManager:
     """Manages document processing and metadata tracking for company RAG system"""
     
-    def __init__(self, data_directory, metadata_path):
+    def __init__(self, data_directory: str, metadata_path: str):
         self.data_directory = data_directory
         self.metadata_path = metadata_path
         self.file_metadata = self.load_file_metadata()
@@ -35,7 +35,7 @@ class DocumentManager:
         except Exception as e:
             print(f"Error saving file metadata: {e}")
     
-    def calculate_file_hash(self, file_path):
+    def calculate_file_hash(self, file_path: str):
         """Calculate SHA-256 hash of file content for change detection"""
         try:
             hash_sha256 = hashlib.sha256()
@@ -47,7 +47,7 @@ class DocumentManager:
             print(f"Error calculating hash for {file_path}: {e}")
             return None
     
-    def get_file_info(self, file_path):
+    def get_file_info(self, file_path: str):
         """Get file information including modification time and hash"""
         try:
             stat = os.stat(file_path)
@@ -62,7 +62,7 @@ class DocumentManager:
             print(f"Error getting file info for {file_path}: {e}")
             return None
     
-    def has_file_changed(self, file_path):
+    def has_file_changed(self, file_path: str):
         """Check if file has changed since last processing"""
         current_info = self.get_file_info(file_path)
         if not current_info:
@@ -106,19 +106,19 @@ class DocumentManager:
         
         return changed_files
     
-    def update_file_metadata(self, file_path, file_info):
+    def update_file_metadata(self, file_path: str, file_info):
         """Update metadata for a processed file"""
         self.file_metadata[file_path] = file_info
         self.save_file_metadata()
     
-    def remove_file_metadata(self, file_path):
+    def remove_file_metadata(self, file_path: str):
         """Remove metadata for a deleted file"""
         if file_path in self.file_metadata:
             del self.file_metadata[file_path]
             self.save_file_metadata()
 
 
-def extract_text_from_pdf(pdf_path):
+def extract_text_from_pdf(pdf_path: str):
     """Extract text from PDF file"""
     try:
         text_content = ""
@@ -137,7 +137,7 @@ def extract_text_from_pdf(pdf_path):
         print(f"Error reading PDF {pdf_path}: {str(e)}")
         return None
 
-def chunk_pdf_text(text, chunk_size, overlap):
+def chunk_pdf_text(text, chunk_size: int, overlap: int):
     """Split large PDF text into manageable chunks for RAG processing"""
     if not text or len(text) <= chunk_size:
         return [text] if text else []
@@ -160,7 +160,7 @@ def chunk_pdf_text(text, chunk_size, overlap):
     
     return chunks
 
-def process_file_for_rag(file_path, file_info):
+def process_file_for_rag(file_path: str, file_info):
     """Process a single file and return documents with metadata"""
     documents = []
     file_ext = Path(file_path).suffix.lower()
@@ -238,6 +238,6 @@ def process_file_for_rag(file_path, file_info):
     
     return documents
 
-def generate_document_id(file_path, chunk_index):
+def generate_document_id(file_path: str, chunk_index: int):
     """Generate unique document ID for vector storage"""
     return f"{file_path}::chunk_{chunk_index}"
