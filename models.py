@@ -9,7 +9,7 @@ from config import (
 )
 
 class EmbeddingModel:
-    def __init__(self, model_type):
+    def __init__(self, model_type: LLMType):
         self.model_type = model_type
         if model_type == EmbeddingsType.OPENAI.value:
             self.client = OpenAI(api_key=os.getenv(OPENAI_API_KEY_ENV_VAR))
@@ -19,7 +19,7 @@ class EmbeddingModel:
             )
 
 class LLMModel:
-    def __init__(self, model_type):
+    def __init__(self, model_type: LLMType):
         self.model_type = model_type
         if model_type == LLMType.OPENAI.value:
             self.client = OpenAI(api_key=os.getenv(OPENAI_API_KEY_ENV_VAR))

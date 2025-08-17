@@ -1,9 +1,10 @@
 """RAG pipeline for company knowledge queries"""
 import os
 import streamlit as st
-from config import (LLMType, OPENAI_API_KEY_ENV_VAR)
+from config import (OPENAI_API_KEY_ENV_VAR, LLMType)
+from models import LLMModel
 
-def find_related_chunks(query, collection, top_k, similarity_threshold):
+def find_related_chunks(query, collection, top_k: int, similarity_threshold: float):
     """Find related document chunks with similarity filtering"""
     results = collection.query(
         query_texts=[query], 
@@ -18,7 +19,7 @@ def find_related_chunks(query, collection, top_k, similarity_threshold):
 
     return filtered
 
-def rag_pipeline(query, collection, llm_model, top_k, max_relevance_distance):
+def rag_pipeline(query, collection, llm_model: LLMModel, top_k: int, max_relevance_distance: float) -> tuple:
     """
     Execute RAG pipeline with conversation history
     
@@ -47,7 +48,7 @@ def rag_pipeline(query, collection, llm_model, top_k, max_relevance_distance):
     references = [chunk[0] for chunk in related_chunks]
     return response, references, augmented_prompt
 
-def validate_environment(llm_type):
+def validate_environment(llm_type: LLMType) -> bool:
     """Validate required environment variables for company RAG"""
     required_vars = [OPENAI_API_KEY_ENV_VAR] if llm_type == LLMType.OPENAI.value else []
     missing_vars = [var for var in required_vars if not os.getenv(var)]
