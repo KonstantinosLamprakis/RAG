@@ -1,12 +1,20 @@
 """LLM and Embedding models for company RAG system"""
+
 import os
-from openai import OpenAI
+
 from chromadb.utils import embedding_functions
+from openai import OpenAI
+
 from config import (
-    LLMType, EmbeddingsType, OPENAI_API_KEY_ENV_VAR,
-    OPENAI_EMBEDDING_MODEL, OPENAI_LLM_MODEL,
-    MAX_TOKENS, TEMPERATURE
+    MAX_TOKENS,
+    OPENAI_API_KEY_ENV_VAR,
+    OPENAI_EMBEDDING_MODEL,
+    OPENAI_LLM_MODEL,
+    TEMPERATURE,
+    EmbeddingsType,
+    LLMType,
 )
+
 
 class EmbeddingModel:
     def __init__(self, model_type: LLMType):
@@ -14,9 +22,10 @@ class EmbeddingModel:
         if model_type == EmbeddingsType.OPENAI.value:
             self.client = OpenAI(api_key=os.getenv(OPENAI_API_KEY_ENV_VAR))
             self.embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
-                api_key=os.getenv(OPENAI_API_KEY_ENV_VAR), 
-                model_name=OPENAI_EMBEDDING_MODEL
+                api_key=os.getenv(OPENAI_API_KEY_ENV_VAR),
+                model_name=OPENAI_EMBEDDING_MODEL,
             )
+
 
 class LLMModel:
     def __init__(self, model_type: LLMType):
@@ -31,7 +40,7 @@ class LLMModel:
                 model=self.model_name,
                 messages=messages,
                 max_tokens=MAX_TOKENS,
-                temperature=TEMPERATURE
+                temperature=TEMPERATURE,
             )
             return response.choices[0].message.content
         except Exception as e:

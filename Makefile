@@ -1,6 +1,6 @@
-.PHONY: format lint check
+.PHONY: lint lint-fix
 
-format:
+lint-fix:
 	black src tests
 	isort src tests
 	ruff check src tests --fix

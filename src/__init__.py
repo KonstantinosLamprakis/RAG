@@ -11,14 +11,14 @@ __author__ = "Company RAG Team"
 # Make key classes available at package level for easy imports
 from .document_manager import DocumentManager
 from .models import EmbeddingModel, LLMModel
-from .vector_store import setup_persistent_chroma, update_vector_database
 from .rag_pipeline import rag_pipeline
+from .vector_store import setup_persistent_chroma, update_vector_database
 
 __all__ = [
     "DocumentManager",
-    "EmbeddingModel", 
+    "EmbeddingModel",
     "LLMModel",
     "setup_persistent_chroma",
-    "update_vector_database", 
-    "rag_pipeline"
+    "update_vector_database",
+    "rag_pipeline",
 ]
