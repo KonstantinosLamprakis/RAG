@@ -1,4 +1,3 @@
-# production code
 openai
 torch
 transformers
@@ -7,9 +6,3 @@ streamlit
 pandas
 python-dotenv
 PyPDF2
-
-# testing
-pytest
-pytest-cov
-pytest-mock
-pytest-asyncio
