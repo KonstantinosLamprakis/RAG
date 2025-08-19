@@ -1,4 +1,4 @@
-.PHONY: lint lint-fix
+.PHONY: lint lint-fix test
 
 lint-fix:
 	black src tests
@@ -10,3 +10,5 @@ lint:
 	isort --check-only src tests
 	ruff check src tests
 
+test:
+	pytest --maxfail=1 --disable-warnings -q

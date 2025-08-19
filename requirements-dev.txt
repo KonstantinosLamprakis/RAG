@@ -1,0 +1,14 @@
+
+# production requirements
+-r requirements.txt
+
+# testing
+pytest
+pytest-cov
+pytest-mock
+pytest-asyncio
+
+# linter
+black
+isort
+ruff
