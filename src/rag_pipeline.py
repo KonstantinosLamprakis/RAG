@@ -1,28 +1,37 @@
 """RAG pipeline for company knowledge queries"""
+
 import os
+
 import streamlit as st
-from config import (OPENAI_API_KEY_ENV_VAR, LLMType)
+
+from config import OPENAI_API_KEY_ENV_VAR, LLMType
 from models import LLMModel
+
 
 def find_related_chunks(query, collection, top_k: int, similarity_threshold: float):
     """Find related document chunks with similarity filtering"""
     results = collection.query(
-        query_texts=[query], 
+        query_texts=[query],
         n_results=top_k,
-        include=["documents", "metadatas", "distances"]
+        include=["documents", "metadatas", "distances"],
     )
 
     filtered = []
-    for doc, meta, dist in zip(results["documents"][0], results["metadatas"][0], results["distances"][0]):
-        if dist <= similarity_threshold: 
+    for doc, meta, dist in zip(
+        results["documents"][0], results["metadatas"][0], results["distances"][0]
+    ):
+        if dist <= similarity_threshold:
             filtered.append((doc, meta))
 
     return filtered
 
-def rag_pipeline(query, collection, llm_model: LLMModel, top_k: int, max_relevance_distance: float) -> tuple:
+
+def rag_pipeline(
+    query, collection, llm_model: LLMModel, top_k: int, max_relevance_distance: float
+) -> tuple:
     """
     Execute RAG pipeline with conversation history
-    
+
     Args:
         top_k (int): the number of the most relevant referencies to fetch.
         max_relevance_distance (float): it will filter out any reference which has bigger distance than that.
@@ -32,13 +41,20 @@ def rag_pipeline(query, collection, llm_model: LLMModel, top_k: int, max_relevan
         references (list): list of related document chunks
         augmented_prompt (str): the prompt sent to the LLM including context
     """
-    
-    related_chunks = find_related_chunks(query, collection, top_k, max_relevance_distance)
+
+    related_chunks = find_related_chunks(
+        query, collection, top_k, max_relevance_distance
+    )
     context = "\n".join(chunk[0] for chunk in related_chunks)
 
-    messages = [{"role": "system", "content": "You are a helpful assistant for company knowledge and procedures. Only answer using the provided context. If there is no relevant information, respond with 'I don't have answer for this.'."}]
-    
-    if hasattr(st, 'session_state') and hasattr(st.session_state, 'chat_history'):
+    messages = [
+        {
+            "role": "system",
+            "content": "You are a helpful assistant for company knowledge and procedures. Only answer using the provided context. If there is no relevant information, respond with 'I don't have answer for this.'.",
+        }
+    ]
+
+    if hasattr(st, "session_state") and hasattr(st.session_state, "chat_history"):
         for msg in st.session_state.chat_history:
             messages.append(msg)
     else:
@@ -51,11 +67,12 @@ def rag_pipeline(query, collection, llm_model: LLMModel, top_k: int, max_relevan
     references = [chunk[0] for chunk in related_chunks]
     return response, references, augmented_prompt
 
+
 def validate_environment(llm_type: LLMType) -> bool:
     """Validate required environment variables for company RAG"""
     required_vars = [OPENAI_API_KEY_ENV_VAR] if llm_type == LLMType.OPENAI.value else []
     missing_vars = [var for var in required_vars if not os.getenv(var)]
-    
+
     if missing_vars:
         st.error(f"Missing environment variables: {', '.join(missing_vars)}")
         st.info("Please set required API keys in your .env file")
