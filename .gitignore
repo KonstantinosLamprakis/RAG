@@ -3,3 +3,6 @@ venv*
 chroma_db/
 file_metadata.json
 __pycache__/
+.coverage
+.pytest_cache/
+htmlcov/

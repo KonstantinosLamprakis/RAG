@@ -4,3 +4,9 @@ chroma_db/
 file_metadata.json
 __pycache__/
 README.md
+.coverage
+.pytest_cache/
+htmlcov/
+tests/
+.gitignore
+pytest.ini
